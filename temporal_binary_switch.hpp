@@ -30,9 +30,11 @@ class TemporalBinarySwitch {
         state = false;
     }
 
+    // checks if just switched on and does not progress time
     bool just_switched_on() const { return m_just_switched_on; }
     bool just_switched_off() const { return m_just_switched_off; }
 
+    // checks if just switched on and progresses time
     bool just_switched_on_temporal() {
         if (m_just_switched_on) {
             m_just_switched_on = false;
