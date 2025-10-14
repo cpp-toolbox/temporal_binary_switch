@@ -79,14 +79,27 @@
  */
 class TemporalBinarySwitch {
   private:
-    bool state = false;              ///< Current state of the switch (true = on, false = off)
-    bool m_just_switched_on = false; ///< True iff signal history is ...v^
-    bool m_just_switched_off = false;///< True iff signal history is ...^v
+    bool state = false;               ///< Current state of the switch (true = on, false = off)
+    bool m_just_switched_on = false;  ///< True iff signal history is ...v^
+    bool m_just_switched_off = false; ///< True iff signal history is ...^v
   public:
     /**
      * @brief Default constructor. Initializes the switch to an off state.
      */
     TemporalBinarySwitch() {}
+
+    /**
+     * @breif set the switch state depending on the incoming value
+     *
+     * internally calls set_true and set_false
+     */
+    void set(const bool &value) {
+        if (value) {
+            set_true();
+        } else {
+            set_false();
+        }
+    }
 
     /**
      * @brief Sets the switch state to true (on).
