@@ -134,6 +134,16 @@ class TemporalBinarySwitch {
     }
 
     /**
+     * @brief Returns true if the switch is currently on.
+     */
+    bool is_on() const { return state; }
+
+    /**
+     * @brief Returns true if the switch is currently off.
+     */
+    bool is_off() const { return !state; }
+
+    /**
      * @brief Checks if the switch has just switched on (non-temporal).
      *
      * This function does not modify internal state.
