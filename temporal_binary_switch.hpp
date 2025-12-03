@@ -1,6 +1,10 @@
 #ifndef TEMPORAL_BINARY_SWITCH_HPP
 #define TEMPORAL_BINARY_SWITCH_HPP
 
+#include <string>
+#include <vector>
+#include <functional> // for std::reference_wrapper
+
 /**
  * @class TemporalBinarySwitch
  * @brief A binary switch that tracks temporal transitions between on and off states.
@@ -78,11 +82,48 @@
  *       update loops or event-driven systems where you only need to react once per transition.
  */
 class TemporalBinarySwitch {
-  private:
-    bool state = false;               ///< Current state of the switch (true = on, false = off)
-    bool m_just_switched_on = false;  ///< True iff signal history is ...v^
-    bool m_just_switched_off = false; ///< True iff signal history is ...^v
+
   public:
+    enum class StateUpdateMethod {
+        /// In this mode the state is updated whenever you call the set function, so you are manually changing the state
+        manual,
+        /// In this mode the state is only updated whenever process is called, so the state doesn't change until that
+        /// occurs
+        process_synchronized
+    };
+
+    StateUpdateMethod state_update_method = TemporalBinarySwitch::StateUpdateMethod::process_synchronized;
+
+  private:
+    enum class State { sustained_off, just_switched_on, sustained_on, just_switched_off };
+
+    State current_state;
+
+    bool state_to_process = false; /// the state that will be used to update when processing (applies when we are in the
+                                   /// process synchornized state update method)
+
+    bool state = false; /// Current state of the switch (true = on, false = off)
+  public:
+    std::string to_string() const {
+        if (just_switched_on()) {
+            return "just switched on";
+        }
+
+        if (just_switched_off()) {
+            return "just switched off";
+        }
+
+        if (sustained_on()) {
+            return "sustained on";
+        }
+
+        if (sustained_off()) {
+            return "sustained off";
+        }
+
+        return "unknown"; // fallback, should never happen
+    }
+
     /**
      * @brief Default constructor. Initializes the switch to an off state.
      */
@@ -94,13 +135,24 @@ class TemporalBinarySwitch {
      * internally calls set_true and set_false
      */
     void set(const bool &value) {
+        switch (state_update_method) {
+        case StateUpdateMethod::manual:
+            update_state(value);
+            break;
+        case StateUpdateMethod::process_synchronized:
+            state_to_process = value;
+            break;
+        }
+    }
+
+  private:
+    void update_state(const bool &value) {
         if (value) {
             set_true();
         } else {
             set_false();
         }
     }
-
     /**
      * @brief Sets the switch state to true (on).
      *
@@ -109,10 +161,9 @@ class TemporalBinarySwitch {
      */
     void set_true() {
         if (!state) { // ...v^
-            m_just_switched_on = true;
-            m_just_switched_off = false;
+            current_state = State::just_switched_on;
         } else { // ...^^
-            m_just_switched_on = false;
+            current_state = State::sustained_on;
         }
         state = true;
     }
@@ -125,72 +176,75 @@ class TemporalBinarySwitch {
      */
     void set_false() {
         if (state) { // ...^v
-            m_just_switched_off = true;
-            m_just_switched_on = false;
+            current_state = State::just_switched_off;
         } else { // ...vv
-            m_just_switched_off = false;
+            current_state = State::sustained_off;
         }
         state = false;
     }
 
+  public:
     /**
-     * @brief Returns true if the switch is currently on.
+     * @brief Returns true iff the signal is ...^
      */
     bool is_on() const { return state; }
 
     /**
-     * @brief Returns true if the switch is currently off.
+     * @brief Returns true iff the signal is ...v
      */
     bool is_off() const { return !state; }
 
     /**
-     * @brief Checks if the switch has just switched on (non-temporal).
-     *
-     * This function does not modify internal state.
-     * @return True if the switch has just transitioned to on; otherwise false.
+     * @brief Returns true iff the signal is ..v^
      */
-    bool just_switched_on() const { return m_just_switched_on; }
+    bool just_switched_on() const { return current_state == State::just_switched_on; }
 
     /**
-     * @brief Checks if the switch has just switched off (non-temporal).
-     *
-     * This function does not modify internal state.
-     * @return True if the switch has just transitioned to off; otherwise false.
+     * @brief Returns true iff the signal is ..^v
      */
-    bool just_switched_off() const { return m_just_switched_off; }
-
-    // NOTE: I don't think the below functions have much use...
+    bool just_switched_off() const { return current_state == State::just_switched_off; }
 
     /**
-     * @brief Checks if the switch has just switched on (temporal).
-     *
-     * This function returns true once per transition from off to on.
-     * If called in succession, only the first call will return true
-     *
-     * @return True if the switch has just transitioned to on since the last check; otherwise false.
+     * @brief Returns true iff the signal is ..^^
      */
-    bool just_switched_on_temporal() {
-        if (m_just_switched_on) {
-            m_just_switched_on = false;
-            return true;
+    bool sustained_on() const { return current_state == State::sustained_on; }
+
+    /**
+     * @brief Returns true iff the signal is ..vv
+     */
+    bool sustained_off() const { return current_state == State::sustained_off; }
+
+    /**
+     * @brief Moves the current state along by repeating the previous state iff set has not be called since last time
+     * this was called
+     *
+     * The purpose of this is for when a switch's set(...) call is inside a conditional block, and there's some external
+     * loop that's iterating.
+     *
+     * If the conditional block doesn't run and the current state of the switch was just switched on, then the signal
+     * will report that it is still in this state because the signal never progressed and modified its internal state.
+     *
+     * This is bad because with respect to the outer loop it will appear as though you'll have two ticks of the outer
+     * loop where the signal will be in the just pressed state which might not be what you want.
+     *
+     * The remedy of to this will be to call the process function on each iteration of the outer loop which will keep
+     * the signal up to date with respect to the outer loop.
+     *
+     * @note In specific cases you won't have to use the process function, such as when each iteration the set(...) is
+     * not run conditionally.
+     *
+     */
+    void process() {
+        switch (state_update_method) {
+        case StateUpdateMethod::process_synchronized:
+
+            update_state(state_to_process);
+
+            break;
+        case StateUpdateMethod::manual:
+            // do nothing.
+            break;
         }
-        return false;
-    }
-
-    /**
-     * @brief Checks if the switch has just switched off (temporal).
-     *
-     * This function returns true once per transition from on to off.
-     * If called in succession, only the first call will return true
-     *
-     * @return True if the switch has just transitioned to off since the last check; otherwise false.
-     */
-    bool just_switched_off_temporal() {
-        if (m_just_switched_off) {
-            m_just_switched_off = false;
-            return true;
-        }
-        return false;
     }
 };
 
