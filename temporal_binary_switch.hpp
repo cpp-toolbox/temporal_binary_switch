@@ -94,9 +94,9 @@ class TemporalBinarySwitch {
 
     StateUpdateMethod state_update_method = TemporalBinarySwitch::StateUpdateMethod::process_synchronized;
 
-  private:
     enum class State { sustained_off, just_switched_on, sustained_on, just_switched_off };
 
+  private:
     State current_state;
 
     bool state_to_process = false; /// the state that will be used to update when processing (applies when we are in the
@@ -184,6 +184,8 @@ class TemporalBinarySwitch {
     }
 
   public:
+    const State &get_current_state() const { return current_state; }
+
     /**
      * @brief Returns true iff the signal is ...^
      */
