@@ -12,7 +12,7 @@
  * Note that throughout these docs ^ will refer to an on signal and v is an off signal.
  *
  * This class manages a boolean state and provides functionality to detect
- * transitions from false → true (just switched on) and true → false (just switched off).
+ * transitions from false -> true (just switched on) and true -> false (just switched off).
  * It also provides temporal query methods that reset their respective transition flags
  * after being checked.
  */
