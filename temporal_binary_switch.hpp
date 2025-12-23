@@ -15,80 +15,87 @@
  * transitions from false → true (just switched on) and true → false (just switched off).
  * It also provides temporal query methods that reset their respective transition flags
  * after being checked.
- *
- * ### Example 1: Basic Usage
- * @code
- * #include "temporal_binary_switch.hpp"
- * #include <iostream>
- *
- * int main() {
- *     TemporalBinarySwitch toggle;
- *
- *     toggle.set_true();
- *
- *     if (toggle.just_switched_on()) {
- *         std::cout << "Switch just turned on!\n";
- *     }
- *
- *     if (toggle.just_switched_on_temporal()) {
- *         std::cout << "Temporal on detected!\n";
- *     }
- *
- *     // Subsequent temporal check will return false until it switches again
- *     if (!toggle.just_switched_on_temporal()) {
- *         std::cout << "No new on transition.\n";
- *     }
- *
- *     toggle.set_false();
- *
- *     if (toggle.just_switched_off_temporal()) {
- *         std::cout << "Switch just turned off!\n";
- *     }
- *
- *     return 0;
- * }
- * @endcode
- *
- * ### Example 2: Loop-based Usage
- * This example demonstrates detecting “just happened” transitions in a simulated update loop.
- * @code
- * #include "TemporalBinarySwitch.hpp"
- * #include <iostream>
- *
- * int main() {
- *     TemporalBinarySwitch input;
- *     bool simulated_button_state[] = {false, false, true, true, false, false};
- *
- *     for (int frame = 0; frame < 6; ++frame) {
- *         bool current_state = simulated_button_state[frame];
- *         if (current_state)
- *             input.set_true();
- *         else
- *             input.set_false();
- *
- *         if (input.just_switched_on_temporal())
- *             std::cout << "Frame " << frame << ": Button just pressed\n";
- *
- *         if (input.just_switched_off_temporal())
- *             std::cout << "Frame " << frame << ": Button just released\n";
- *     }
- *
- *     return 0;
- * }
- * @endcode
- *
- * @note The temporal query methods (`just_switched_on_temporal` and `just_switched_off_temporal`)
- *       consume their respective flags when called. This makes them ideal for polling within
- *       update loops or event-driven systems where you only need to react once per transition.
  */
 class TemporalBinarySwitch {
 
   public:
     enum class StateUpdateMethod {
-        /// In this mode the state is updated whenever you call the set function, so you are manually changing the state
+        /**
+         * @brief In this mode the state is updated whenever you call the set function, so you are manually changing the
+         * state whenever you call the setters
+         *
+         * @code
+         * #include "temporal_binary_switch.hpp"
+         * #include <iostream>
+         *
+         * int main() {
+         *     TemporalBinarySwitch toggle{TemporalBinarySwitch::StateUpdateMethod::manual};
+         *
+         *     toggle.set_true();
+         *
+         *     if (toggle.just_switched_on()) {
+         *         std::cout << "Switch just turned on!\n";
+         *     }
+         *
+         *     if (toggle.just_switched_on_temporal()) {
+         *         std::cout << "Temporal on detected!\n";
+         *     }
+         *
+         *     // Subsequent temporal check will return false until it switches again
+         *     if (!toggle.just_switched_on_temporal()) {
+         *         std::cout << "No new on transition.\n";
+         *     }
+         *
+         *     toggle.set_false();
+         *
+         *     if (toggle.just_switched_off_temporal()) {
+         *         std::cout << "Switch just turned off!\n";
+         *     }
+         *
+         *     return 0;
+         * }
+         * @endcode
+         *
+         * Or in a loop without conditional logic [todo example here]
+         *
+         */
         manual,
-        /// In this mode the state is only updated whenever process is called, so the state doesn't change until that
-        /// occurs
+        /**
+         *
+         * @brief In this mode the state is only updated whenever process is called, so the state doesn't change until
+         * that occurs
+         *
+         * @details This is useful for situations when on each iteration of a loop the set function is called
+         * conditionally. When this is the case if we were in manual mode, then internal state wouldn't update on ticks
+         * when that conditional code is not run.
+         *
+         * @code
+         * #include "TemporalBinarySwitch.hpp"
+         * #include <iostream>
+         *
+         * int main() {
+         *     TemporalBinarySwitch input;
+         *     bool simulated_button_state[] = {false, false, true, true, false, false};
+         *
+         *     for (int frame = 0; frame < 6; ++frame) {
+         *         bool current_state = simulated_button_state[frame];
+         *         if (current_state)
+         *             input.set_true();
+         *         else
+         *             input.set_false();
+         *
+         *         if (input.just_switched_on_temporal())
+         *             std::cout << "Frame " << frame << ": Button just pressed\n";
+         *
+         *         if (input.just_switched_off_temporal())
+         *             std::cout << "Frame " << frame << ": Button just released\n";
+         *     }
+         *
+         *     return 0;
+         * }
+         * @endcode
+         *
+         */
         process_synchronized
     };
 
@@ -127,7 +134,9 @@ class TemporalBinarySwitch {
     /**
      * @brief Default constructor. Initializes the switch to an off state.
      */
-    TemporalBinarySwitch() {}
+    TemporalBinarySwitch(
+        const StateUpdateMethod &state_update_method = TemporalBinarySwitch::StateUpdateMethod::process_synchronized)
+        : state_update_method(state_update_method) {}
 
     /**
      * @breif set the switch state depending on the incoming value
